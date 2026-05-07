@@ -1,6 +1,5 @@
 
-# Cesium AQI Heatmap (Django + Postgres) — No Celery
-
+# Cesium AQI Heatmap (Django + Postgres)
 This project serves a Cesium heatmap page and **ingests WAQI data once** automatically
 every time you run any `manage.py` command (e.g. `runserver`, `migrate`, etc.).
 
