@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <script src="./../../static/CesiumHeatmap.js"></script>
+  <link href="https://cesium.com/downloads/cesiumjs/releases/1.117/Build/Cesium/Widgets/widgets.css" rel="stylesheet" />
+  <style>
+    html, body, #cesiumContainer {
+      height: 100%; margin: 0; padding: 0; overflow: hidden;
+    }
+    #toggleControl {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      background: white;
+      padding: 8px;
+      z-index: 999;
+      font-family: sans-serif;
+    }
+  </style>
+</head>
+<body>
+  <div id="cesiumContainer"></div>
+  <div id="toggleControl">
+    <label>
+      View Mode:
+      <select id="tilesetToggle">
+        <option value="google">Google Photorealistic</option>
+        <option value="osm">OSM Buildings</option>
+      </select>
+    </label>
+  </div>
+
+  <script>
+    Cesium.Ion.defaultAccessToken = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiJkMjFkZTI0My0yNTIyLTQwNDgtODYzMi04ZWJkNjUxZjI1ZmYiLCJpZCI6MzE5NTU5LCJpYXQiOjE3NTE5Njg1NTh9.c64SWjcpU5pRpC3tIzOURbaeP99QiQtxJRtKAdZrcqY";
+
+    const viewer = new Cesium.Viewer("cesiumContainer", {
+      terrain: Cesium.Terrain.fromWorldTerrain(),
+      shadows: true,
+      scene3DOnly: true
+    });
+
+    let googleTileset, osmBuildings;
+
+    // Load both tilesets but make one invisible initially
+    async function loadTilesets() {
+      googleTileset = await Cesium.createGooglePhotorealistic3DTileset();
+      googleTileset.show = true;
+      viewer.scene.primitives.add(googleTileset);
+
+      osmBuildings = await Cesium.createOsmBuildingsAsync();
+      osmBuildings.show = false;
+      viewer.scene.primitives.add(osmBuildings);
+    }
+
+    loadTilesets();
+
+    // Camera fly-to
+    viewer.camera.flyTo({
+      destination: Cesium.Cartesian3.fromDegrees(-0.1696985, 51.4843075, 300),
+      orientation: {
+        heading: Cesium.Math.toRadians(0),
+        pitch: Cesium.Math.toRadians(-35),
+        roll: 0
+      }
+    });
+
+    // Toggle logic
+    document.getElementById("tilesetToggle").addEventListener("change", function () {
+      const mode = this.value;
+      if (googleTileset && osmBuildings) {
+        googleTileset.show = mode === "google";
+        osmBuildings.show = mode === "osm";
+      }
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,1766 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Cesium – AQI/Temp/Bikes (IDW) + DSM + Photorealistic + OSM</title>
+
+  <!-- Silence favicon 404 -->
+  <link rel="icon" href="data:,">
+
+  <!-- ✅ Bootstrap (only for Offcanvas UI) -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+
+  <!-- CesiumJS -->
+  <script src="https://cesium.com/downloads/cesiumjs/releases/1.117/Build/Cesium/Cesium.js"></script>
+  <link href="https://cesium.com/downloads/cesiumjs/releases/1.117/Build/Cesium/Widgets/widgets.css" rel="stylesheet" />
+
+  <style>
+    html, body, #cesiumContainer { width:100%; height:100%; margin:0; padding:0; overflow:hidden; }
+    .cesium-infoBox-description { font-size: 13px; }
+
+    /* Your existing panel styles (kept same) */
+    .left-shell { position:absolute; left:16px; top:16px; z-index:1000; width:340px; max-width:calc(100% - 32px); }
+    .dea-panel { background: rgba(18, 18, 18, 0.82); color:#fff; border-radius:12px; padding:14px; box-shadow:0 8px 28px rgba(0,0,0,.35); backdrop-filter: blur(8px); }
+    .dea-header { display:flex; align-items:center; gap:10px; margin-bottom:10px; }
+    .dea-title { font:700 15px/1.2 system-ui, -apple-system, Segoe UI, Roboto, sans-serif; opacity:.95; }
+    .dea-row { margin-top:10px; }
+    .dea-search { display:flex; align-items:center; gap:8px; background:#111; border:1px solid #2a2a2a; border-radius:10px; padding:8px 10px; }
+    .dea-search input { flex:1; background:transparent; border:none; outline:none; color:#eaeaea; font:500 13px system-ui; }
+    .dea-btnbar { display:flex; gap:8px; margin-top:10px; }
+    .btn { appearance:none; border:none; cursor:pointer; border-radius:10px; padding:10px 12px; font:600 13px/1 system-ui; color:#fff; background:#1f6feb; box-shadow:0 2px 10px rgba(0,0,0,.2); transition:.2s background, .05s transform; }
+    .btn:hover { background:#1a60d1; } .btn:active { transform: translateY(1px); }
+    .btn.gray { background:#6b7280; } .btn.gray:hover { background:#5b6270; }
+    .dea-note { font:12px/1.4 system-ui; opacity:.85; margin-top:8px; }
+    .dea-section-title { font:700 12px system-ui; opacity:.9; margin-top:12px; }
+    .dea-explore-list { margin-top:8px; display:flex; flex-direction:column; gap:8px; }
+    .dea-chip { display:flex; justify-content:space-between; align-items:center; border-radius:10px; padding:10px 12px; background:#222; border:1px solid #2c2c2c; cursor:pointer; }
+    .dea-chip:hover { background:#262626; }
+    .dea-chip small { opacity:.75; }
+    .cta { display:flex; align-items:center; justify-content:center; gap:8px; margin-top:12px; padding:10px 12px; background:#0ea5e9; border-radius:10px; cursor:pointer; font-weight:700; }
+    .cta:hover { background:#0891cf; }
+    .dea-chip.disabled { opacity:.5; pointer-events:none; }
+    .dea-chip.active   { outline:2px solid #38bdf8; }
+
+    .top-right { position:absolute; right:170px; top:6px; z-index:1000; display:flex; gap:8px; flex-wrap:wrap; }
+    .top-btn { background:rgba(18,18,18,.82); color:#fff; border:1px solid #2a2a2a; padding:8px 10px; border-radius:10px; font:600 12px system-ui; cursor:pointer; }
+    .top-btn:hover{ background:#1d1d1d; }
+
+    .settings-panel{ position:absolute; right:16px; top:56px; z-index:1000; width:360px; background:#2e3844; color:#fff; border-radius:12px; box-shadow:0 8px 28px rgba(0,0,0,.35); border:1px solid #22303b; padding:12px; }
+    .settings-header{ display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; font:700 14px system-ui; }
+    .xbtn{ background:transparent; color:#fff; border:none; font-size:16px; cursor:pointer; opacity:.8; }
+    .xbtn:hover{ opacity:1; }
+
+    .btn-group{ display:flex; gap:8px; margin:8px 0 4px; }
+    .seg{ flex:1; border:none; border-radius:8px; padding:8px 10px; background:#3a4653; color:#fff; font:600 12px system-ui; cursor:pointer; }
+    .seg:hover{ background:#425062; }
+
+    .chk{ display:flex; align-items:center; gap:8px; margin:8px 0; font:13px system-ui; }
+    .section-title{ margin-top:10px; font:700 12px system-ui; opacity:.9; }
+    .basemap-grid{ display:grid; grid-template-columns: repeat(5, 1fr); gap:6px; margin:8px 0; }
+    .bm{ height:52px; border-radius:8px; background:#1f2937; border:2px solid transparent; font:600 10px/52px system-ui; color:#cbd5e1; text-align:center; cursor:pointer; padding:0 4px; }
+    .bm:hover{ background:#243244; }
+    .bm.selected{ border-color:#38bdf8; }
+
+    .quality-row{ display:flex; align-items:center; gap:10px; }
+    .quality-row input[type="range"]{ flex:1; }
+
+    .right-rail { position:absolute; right:16px; top:110px; z-index:1000; display:flex; flex-direction:column; gap:10px; }
+    .rail-btn { width:40px; height:40px; border-radius:10px; background:rgba(18,18,18,.82); color:#fff; display:grid; place-items:center; border:1px solid #2a2a2a; cursor:pointer; }
+    .rail-btn:hover{ background:#1d1d1d; }
+
+    .measure-on canvas, .measure-on { cursor: crosshair !important; }
+
+    .timeseries-widget {
+      margin-top: 12px;
+      padding: 8px 10px;
+      border-radius: 6px;
+      background: rgba(0, 0, 0, 0.4);
+      font-size: 12px;
+    }
+    .timeseries-widget .ts-row {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 4px;
+    }
+    .timeseries-widget .ts-label { opacity: 0.8; }
+    .timeseries-widget .ts-value { font-weight: 600; }
+
+    /* ✅ Offcanvas styling to match your panel */
+    .offcanvas-aqi {
+      background: transparent !important;
+      border: none !important;
+      box-shadow: none !important;
+      width: 360px !important;
+    }
+    .offcanvas-backdrop.show { opacity: 0.25; }
+    .offcanvas-body { padding: 0.75rem; }
+
+    /* ✅ Panel open button */
+    .panel-toggle-btn {
+      position: absolute;
+      left: 16px;
+      top: 16px;
+      z-index: 1100;
+      background: rgba(18, 18, 18, 0.82);
+      color: #fff;
+      border: 1px solid #2a2a2a;
+      padding: 8px 10px;
+      border-radius: 10px;
+      font: 700 12px system-ui;
+      cursor: pointer;
+    }
+    .panel-toggle-btn:hover { background: #1d1d1d; }
+  </style>
+
+</head>
+
+<body>
+  <div id="cesiumContainer"></div>
+
+  <!-- ✅ OFFCANVAS TOGGLE BUTTON -->
+  <button class="panel-toggle-btn"
+          type="button"
+          data-bs-toggle="offcanvas"
+          data-bs-target="#leftPanelOffcanvas"
+          aria-controls="leftPanelOffcanvas">
+    ☰ Panel
+  </button>
+
+  <!-- ✅ LEFT PANEL AS BOOTSTRAP OFFCANVAS -->
+  <div class="offcanvas offcanvas-start offcanvas-aqi show"
+       tabindex="-1"
+       id="leftPanelOffcanvas"
+       aria-labelledby="leftPanelOffcanvasLabel"
+       data-bs-scroll="true"
+       data-bs-backdrop="false">
+
+    <div class="offcanvas-header" style="padding: 0 12px; margin-top: 8px;">
+      <div id="leftPanelOffcanvasLabel" style="color:#fff; font:700 12px system-ui; opacity:.85;">Panel</div>
+      <button type="button" class="btn-close btn-close-white" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+    </div>
+
+    <div class="offcanvas-body">
+      <!-- ORIGINAL LEFT PANEL CONTENT (unchanged) -->
+      <div class="left-shell" style="position: static; width: 340px; max-width: 100%; left: auto; top: auto;">
+        <div class="dea-panel">
+          <div class="dea-header">
+            <img src="https://upload.wikimedia.org/wikipedia/commons/4/4e/Cesium_Logo.svg" alt="" width="24" height="24">
+            <div class="dea-title">Explore & Add Data</div>
+          </div>
+
+          <div class="dea-row dea-search">
+            <span>🔎</span>
+            <input id="searchBox" type="text" placeholder="Search for locations" />
+            <button id="searchBtn" class="btn gray" style="padding:8px 10px;">Go</button>
+          </div>
+
+          <div class="dea-btnbar">
+            <button id="openExplore" class="btn">+ Explore data</button>
+            <button id="openUpload" class="btn gray">⬆ Upload data</button>
+          </div>
+
+          <div id="explorePanel" style="display:none;">
+            <div class="dea-explore-list">
+              <div class="dea-chip explore-item" data-layer="AQI">
+                <div>AQI</div>
+              </div>
+              <div class="dea-chip explore-item" data-layer="TEMP">
+                <div>Temperature</div>
+              </div>
+              <div class="dea-chip explore-item" data-layer="BIKES">
+                <div>Bikes</div>
+              </div>
+              <div class="dea-chip explore-item" data-layer="DSM">
+                <div>DSM</div>
+              </div>
+              <div class="dea-chip explore-item" data-layer="PHOTOREALISTIC">
+                <div>Photorealistic 3D</div>
+              </div>
+              <div class="dea-chip explore-item" data-layer="OSM">
+                <div>OSM Buildings</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="timeseries-widget">
+            <div class="ts-row">
+              <span class="ts-label">Time</span>
+              <span id="ts-time" class="ts-value">–</span>
+            </div>
+            <div class="ts-row">
+              <span class="ts-label">AQI</span>
+              <span id="ts-aqi" class="ts-value">–</span>
+            </div>
+            <div class="ts-row">
+              <span class="ts-label">Temp (°C)</span>
+              <span id="ts-temp" class="ts-value">–</span>
+            </div>
+          </div>
+
+          <div class="dea-note">
+            <ul style="margin:6px 0 0 16px; padding:0;"></ul>
+          </div>
+
+          <div class="dea-row cta" id="takeTour">🎥 Take the tour</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- TOP-RIGHT ACTIONS -->
+  <div class="top-right">
+    <button id="btnMapSettings" class="top-btn">🗺️ Map Settings</button>
+
+    <!-- Timeline toggle: hidden by default, only shown when AQI dataset is active -->
+    <label id="timelineToggleWrapper"
+           class="top-btn"
+           style="display:none; align-items:center; gap:6px; cursor:pointer;">
+      <input type="checkbox" id="chkTimelineMode" style="margin:0;" />
+      Timeline
+    </label>
+
+    <div class="top-btn">Help</div>
+    <div class="top-btn">Story</div>
+    <div class="top-btn">Share / Print</div>
+  </div>
+
+  <!-- MAP SETTINGS PANEL -->
+  <div id="mapSettings" class="settings-panel" style="display:none;">
+    <div class="settings-header">
+      <div>Map View</div>
+      <button id="closeSettings" class="xbtn">✕</button>
+    </div>
+
+    <div class="btn-group">
+      <button id="mv3dTerrain" class="seg">3D Terrain</button>
+      <button id="mv3dSmooth" class="seg">3D Smooth</button>
+      <button id="mv2d" class="seg">2D</button>
+    </div>
+
+    <label class="chk">
+      <input id="chkDepthTest" type="checkbox" />
+      Terrain hides underground features
+    </label>
+
+    <div class="section-title">Base Map</div>
+    <div class="basemap-grid">
+      <div class="bm" data-id="bing">Bing Aerial+Labels</div>
+      <div class="bm" data-id="esri">ESRI World Imagery</div>
+      <div class="bm selected" data-id="osm">OpenStreetMap</div>
+      <div class="bm" data-id="dark">Dark Gray</div>
+      <div class="bm" data-id="light">Light Gray</div>
+    </div>
+
+    <div class="section-title">Timeline</div>
+    <label class="chk">
+      <input id="chkTimeline" type="checkbox" />
+      Always show
+    </label>
+
+    <div class="section-title">Image Optimisation</div>
+    <label class="chk">
+      <input id="chkNativeRes" type="checkbox" checked />
+      Use native device resolution
+    </label>
+
+    <div class="section-title">Map Quality</div>
+    <div class="quality-row">
+      <span>Quality</span>
+      <input id="qualitySlider" type="range" min="0" max="100" value="60" />
+      <span>Performance</span>
+    </div>
+  </div>
+
+  <div class="right-rail">
+    <div class="rail-btn" id="btnHome" title="Home">⌂</div>
+    <div class="rail-btn" id="btnLive" title="Live location">📍</div>
+    <div class="rail-btn" id="btnMeasure" title="Measure distance">📏</div>
+    <div class="rail-btn" id="btnReset" title="Reset / clear layers">⟲</div>
+    <div class="rail-btn" id="btnZoomIn" title="Zoom in">+</div>
+    <div class="rail-btn" id="btnZoomOut" title="Zoom out">−</div>
+  </div>
+
+  <!-- ✅ Bootstrap JS (needed for Offcanvas open/close) -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+
+  <!-- ✅ YOUR ORIGINAL SCRIPT (UNCHANGED) -->
+    <script>
+    let viewer;
+    const DEFAULT_BASEMAP = 'https://a.tile.openstreetmap.org/{z}/{x}/{y}.png';
+    let baseLayer = null;
+
+    // 3D tiles refs
+    let googleTileset = null;
+    let osmBuildings = null;
+
+    // DSM refs
+    let dsmLayer = null;
+    let dsmTileset = null;
+
+    // IDW imagery layers
+    let aqiHeatmap = null;
+    let tempHeatmap = null;
+    let bikesHeatmap = null;
+
+    // Mode-specific click handlers/entities
+    let aqiClickHandler = null, aqiProbeEntity = null;
+    let tempClickHandler = null;
+
+
+    let timelineMode = false;                  // live mode by default
+    let overviewTimelineTickHandler = null;    // left-panel AQI/Temp text
+    let stationTimelineTickHandler = null;     // per-station labels/colors
+    let aqiTimelineIdwEnabled = false;
+    let aqiTimelineLastHourKey = null;
+
+    // IDW contexts (for sampling or legend if needed)
+    window.AQI_IDW = null;
+    window.TEMP_IDW = null;
+    window.BIKES_IDW = null;
+
+    async function startViewer() {
+      Cesium.Ion.defaultAccessToken = "{{ CESIUM_ION_TOKEN }}";
+
+      viewer = new Cesium.Viewer("cesiumContainer", {
+        terrain: Cesium.Terrain.DEFAULT,
+        imageryProvider: new Cesium.UrlTemplateImageryProvider({ url: DEFAULT_BASEMAP }),
+        baseLayerPicker: true, infoBox: true, selectionIndicator: true,
+        sceneMode: Cesium.SceneMode.SCENE3D, geocoder: false, timeline: true, animation: true
+      });
+
+      baseLayer = viewer.imageryLayers.get(0);
+      viewer.scene.globe.verticalExaggeration = 100.0;
+      viewer.camera.flyTo({ destination: Cesium.Cartesian3.fromDegrees(133.8, -25.3, 2500000) });
+
+      wireUI();
+      wireLiveButton();
+      wireMeasureButton();
+      wireResetButton();
+      wireExploreGeneric();
+      wireTimelineToggle(); 
+    }
+
+    // ---------- Measure tool ----------
+    let measureActive=false, measureHandler=null, measureFirstPos=null, measureLine=null, measureLabel=null;
+    function wireMeasureButton() {
+      document.getElementById('btnMeasure').onclick = () => { if (measureActive) deactivateMeasure(); else activateMeasure(); };
+    }
+    function activateMeasure() {
+      measureActive = true;
+      if (measureHandler) measureHandler.destroy();
+      measureHandler = new Cesium.ScreenSpaceEventHandler(viewer.scene.canvas);
+      measureHandler.setInputAction((click) => {
+        const cartesian = viewer.scene.pickPosition(click.position)
+          || viewer.camera.pickEllipsoid(click.position, viewer.scene.globe.ellipsoid);
+        if (!cartesian) return;
+        if (!measureFirstPos) {
+          measureFirstPos = cartesian;
+          viewer.entities.add({ id: "measure-start", position: measureFirstPos,
+            point: { pixelSize: 8, color: Cesium.Color.LIME, outlineColor: Cesium.Color.BLACK, outlineWidth: 1 }});
+        } else {
+          const secondPos = cartesian;
+          const km = computeGeodesicDistanceKm(measureFirstPos, secondPos);
+          if (measureLine) viewer.entities.remove(measureLine);
+          measureLine = viewer.entities.add({ polyline: { positions: [measureFirstPos, secondPos], width: 3, material: Cesium.Color.YELLOW }});
+          const mid = Cesium.Cartesian3.midpoint(measureFirstPos, secondPos, new Cesium.Cartesian3());
+          if (measureLabel) viewer.entities.remove(measureLabel);
+          measureLabel = viewer.entities.add({
+            position: mid, label: { text: `${km.toFixed(2)} km`, font: "bold 14px sans-serif", fillColor: Cesium.Color.WHITE,
+            showBackground: true, backgroundColor: Cesium.Color.BLACK.withAlpha(0.6), pixelOffset: new Cesium.Cartesian2(0, -20),
+            disableDepthTestDistance: Number.POSITIVE_INFINITY }});
+          viewer.entities.removeById("measure-start");
+          measureFirstPos = null; deactivateMeasure(true);
+        }
+      }, Cesium.ScreenSpaceEventType.LEFT_CLICK);
+    }
+    function deactivateMeasure(keepGraphics=false){
+      measureActive=false;
+      if (measureHandler) { measureHandler.destroy(); measureHandler=null; }
+      if (!keepGraphics) {
+        viewer.entities.removeById("measure-start");
+        if (measureLine)  { viewer.entities.remove(measureLine);  measureLine=null; }
+        if (measureLabel) { viewer.entities.remove(measureLabel); measureLabel=null; }
+      }
+    }
+    function computeGeodesicDistanceKm(a,b){
+      const e=Cesium.Ellipsoid.WGS84, ca=e.cartesianToCartographic(a), cb=e.cartesianToCartographic(b);
+      return new Cesium.EllipsoidGeodesic(ca, cb).surfaceDistance/1000.0;
+    }
+
+    // ---------- Cleanup (preserve basemap) ----------
+    async function clearAllOverlays() {
+      try { if (Cesium.Terrain && Cesium.Terrain.DEFAULT) viewer.terrain = Cesium.Terrain.DEFAULT; } catch {}
+
+      // 3D tiles + DSM
+      try {
+        if (dsmLayer)   { try { viewer.imageryLayers.remove(dsmLayer, true); } catch {} dsmLayer = null; }
+        if (dsmTileset) { viewer.scene.primitives.remove(dsmTileset); dsmTileset = null; }
+        if (googleTileset) { viewer.scene.primitives.remove(googleTileset); googleTileset = null; }
+        if (osmBuildings)  { viewer.scene.primitives.remove(osmBuildings);  osmBuildings  = null; }
+      } catch(e){}
+
+      // Heatmap layers
+      try {
+        if (aqiHeatmap)   { viewer.imageryLayers.remove(aqiHeatmap, true);   aqiHeatmap = null; }
+        if (tempHeatmap)  { viewer.imageryLayers.remove(tempHeatmap, true);  tempHeatmap = null; }
+        if (bikesHeatmap) { viewer.imageryLayers.remove(bikesHeatmap, true); bikesHeatmap = null; }
+      } catch(e){}
+
+      // Click handlers
+      disableAQIClickSampling();
+      disableTempClickCharts();
+      disableBikeClickSampling();
+
+      window.AQI_IDW = null;
+      window.TEMP_IDW = null;
+      window.BIKES_IDW = null;
+
+      try {
+        viewer.entities.removeAll();
+        viewer.dataSources.removeAll();
+        const layers = viewer.imageryLayers;
+        for (let i = layers.length - 1; i >= 1; i--) layers.remove(layers.get(i), true);
+        baseLayer = layers.get(0);
+      } catch(err){ console.error("[clearAllOverlays] failed:", err); }
+    }
+
+    // ---------- Explore wiring ----------
+    async function flyToLondon() {
+      return viewer.camera.flyTo({
+        destination: Cesium.Cartesian3.fromDegrees(-0.1, 51.5, 1500.0),
+        duration: 1.3
+      });
+    }
+
+    function wireExploreGeneric() {
+  const items = Array.from(document.querySelectorAll('.explore-item'));
+  const setDisabled = (yes) => items.forEach(el => el.classList.toggle('disabled', !!yes));
+  const setActive = (activeEl) => items.forEach(el => el.classList.toggle('active', el === activeEl));
+
+  const timelineWrapper = document.getElementById('timelineToggleWrapper');
+  const timelineChk = document.getElementById('chkTimelineMode');
+
+  items.forEach(el => {
+    el.onclick = async () => {
+      const key = el.getAttribute('data-layer');
+      const loader = LAYERS[key];
+      if (!loader) return;
+
+      setDisabled(true);
+      setActive(null);
+
+      // Whenever we switch dataset, clear overlays
+      await clearAllOverlays();
+
+      try {
+        await loader();
+        setActive(el);
+
+        // ---- NEW: control visibility of the timeline checkbox ----
+        if (timelineWrapper && timelineChk) {
+          if (key === 'AQI') {
+            // We’re in AQI mode: allow timeline playback
+            timelineWrapper.style.display = 'flex';
+          } else {
+            // Not AQI → hide and turn off timeline (back to live)
+            timelineWrapper.style.display = 'none';
+            if (timelineChk.checked) {
+              timelineChk.checked = false;
+              disableTimelineMode();   // uses the function you already have
+            }
+          }
+        }
+        // ---------------------------------------------------------
+
+      } catch (e) {
+        console.error(`[explore:${key}] load failed`, e);
+        alert(`Failed to load ${key}.`);
+      } finally {
+        setDisabled(false);
+      }
+    };
+  });
+}
+
+
+    function wireResetButton(){
+      document.getElementById('btnReset').onclick = async () => {
+        await clearAllOverlays();
+        viewer.camera.flyTo({ destination: Cesium.Cartesian3.fromDegrees(0, 20, 20000000), duration: 1.0 });
+        document.querySelectorAll('.explore-item').forEach(el => el.classList.remove('active'));
+      };
+    }
+    function wireLiveButton(){ document.getElementById('btnLive').onclick = onLocate; }
+    async function onLocate(){
+      if (!navigator.geolocation) return alert("Geolocation not supported by this browser.");
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          const lat = pos.coords.latitude, lon = pos.coords.
+          longitude;
+          if (viewer.entities.getById("live-location")) viewer.entities.removeById("live-location");
+          viewer.entities.add({
+            id: "live-location", position: Cesium.Cartesian3.fromDegrees(lon, lat),
+            point: { pixelSize: 12, color: Cesium.Color.CYAN, outlineColor: Cesium.Color.WHITE, outlineWidth: 2 },
+            label: { text: "You are here", font: "bold 12px sans-serif", fillColor: Cesium.Color.WHITE,
+              showBackground: true, backgroundColor: Cesium.Color.BLACK.withAlpha(0.6),
+              pixelOffset: new Cesium.Cartesian2(0, -18), disableDepthTestDistance: Number.POSITIVE_INFINITY }
+          });
+          viewer.camera.flyTo({ destination: Cesium.Cartesian3.fromDegrees(lon, lat, 1200), duration: 1.6 });
+        },
+        () => alert("Unable to get location. Allow permissions and try again."),
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+      );
+    }
+    function wireUI(){
+      document.getElementById('openExplore').onclick = () => {
+        const p = document.getElementById('explorePanel');
+        p.style.display = (p.style.display === 'none') ? 'block' : 'none';
+      };
+      document.getElementById('openUpload').onclick = () => alert("Upload coming soon.");
+      document.getElementById('takeTour').onclick = () => alert("Tour coming soon.");
+
+      document.getElementById('btnHome').onclick = () =>
+        viewer.camera.flyTo({ destination: Cesium.Cartesian3.fromDegrees(0, 20, 20000000), duration: 1.2 });
+      document.getElementById('btnZoomIn').onclick = () => viewer.camera.zoomIn(1000.0);
+      document.getElementById('btnZoomOut').onclick = () => viewer.camera.zoomOut(1000.0);
+
+      document.getElementById('searchBtn').onclick = doSearch;
+      document.getElementById('searchBox').addEventListener('keydown', e => { if (e.key === 'Enter') doSearch(); });
+    }
+    async function doSearch(){
+      const q = document.getElementById('searchBox').value.trim();
+      if (!q) return;
+      try{
+        const r = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q)}`, { headers: { 'Accept-Language': 'en' }});
+        const j = await r.json();
+        if (!j.length) return alert("No results.");
+        const { lon, lat } = j[0];
+        viewer.camera.flyTo({ destination: Cesium.Cartesian3.fromDegrees(parseFloat(lon), parseFloat(lat), 1200), duration:1.4 });
+      }catch(e){ console.error(e); alert("Search failed."); }
+    }
+
+    // ---------- Generic IDW + color ramps ----------
+    function hexToRgb(hex){ const s=hex.replace('#',''); const n=parseInt(s.length===3?s.split('').map(ch=>ch+ch).join(''):s,16); return {r:(n>>16)&255,g:(n>>8)&255,b:n&255}; }
+    function lerp(a,b,t){ return a+(b-a)*t; }
+    function lerpColor(c1,c2,t){ return { r:Math.round(lerp(c1.r,c2.r,t)), g:Math.round(lerp(c1.g,c2.g,t)), b:Math.round(lerp(c1.b,c2.b,t)) }; }
+    function makeValueToRGB(STOPS){
+      return function(v){
+        if (v <= STOPS[0].v) return hexToRgb(STOPS[0].c);
+        for (let i=0;i<STOPS.length-1;i++){ const a=STOPS[i], b=STOPS[i+1];
+          if (v <= b.v){ const t=(v-a.v)/(b.v-a.v); return lerpColor(hexToRgb(a.c), hexToRgb(b.c), t); } }
+        return hexToRgb(STOPS[STOPS.length-1].c);
+      };
+    }
+    // Ramps
+    const AQI_STOPS   = [ {v:0,c:"#00e400"},{v:50,c:"#ffff00"},{v:100,c:"#ff9933"},{v:150,c:"#cc0033"},{v:200,c:"#660099"},{v:300,c:"#7e0023"} ];
+    const TEMP_STOPS  = [ {v:-5,c:"#1e3a8a"},{v:0,c:"#60a5fa"},{v:10,c:"#22c55e"},{v:20,c:"#f59e0b"},{v:30,c:"#ef4444"},{v:40,c:"#991b1b"} ];
+    const BIKES_STOPS = [ {v:0,c:"#ef4444"},{v:33,c:"#f59e0b"},{v:66,c:"#84cc16"},{v:100,c:"#16a34a"} ];
+
+    /**
+     * Render an IDW heatmap (value-only) to a data URL.
+     * points: [{lon,lat,value}]
+     * bbox:   {west,east,south,north}
+     * opts:   {width,height,power,stops}
+     */
+    function renderIDWHeatmap(points, bbox, opts = {}) {
+      const width  = opts.width  ?? 768;
+      const height = opts.height ?? 768;
+      const power  = opts.power  ?? 2;
+      const eps    = 1e-6;
+      const toRGB  = makeValueToRGB(opts.stops ?? AQI_STOPS);
+      const { west, east, south, north } = bbox;
+
+      const canvas=document.createElement('canvas'); canvas.width=width; canvas.height=height;
+      const ctx=canvas.getContext('2d',{ willReadFrequently:true });
+      const img=ctx.createImageData(width,height);
+
+      const pts = points.map(p => ({
+        x:(p.lon-west)/(east-west)*(width-1),
+        y:(1-(p.lat-south)/(north-south))*(height-1),
+        v:p.value
+      }));
+
+      let idx = 0;
+      for (let j=0;j<height;j++){
+        for (let i=0;i<width;i++){
+          let num=0, den=0, val=0;
+          for (let k=0;k<pts.length;k++){
+            const dx=i-pts[k].x, dy=j-pts[k].y, d2=dx*dx+dy*dy;
+            if (d2 < 1) { val = pts[k].v; den=1; num=val; break; }
+            const w = 1 / Math.pow(d2 + eps, power/2);
+            num += w * pts[k].v; den += w;
+          }
+          val = den>0 ? num/den : 0;
+
+          const {r,g,b} = toRGB(val);
+          img.data[idx++] = r;
+          img.data[idx++] = g;
+          img.data[idx++] = b;
+          img.data[idx++] = 200; // alpha of the PNG; layer alpha multiplies this
+        }
+      }
+      ctx.putImageData(img,0,0);
+      return canvas.toDataURL('image/png');
+    }
+
+
+
+    function restoreLiveAqiIdwFromCache() {
+  if (!window.AQI_IDW || !window.AQI_IDW.points || !window.AQI_IDW.points.length) {
+    return;
+  }
+  const { points, bbox, power, width, height } = window.AQI_IDW;
+  const { west, east, south, north } = bbox;
+
+  const url = renderIDWHeatmap(points, bbox, {
+    width: width ?? 768,
+    height: height ?? 768,
+    power: power ?? 2,
+    stops: AQI_STOPS
+  });
+
+  const rectangle = Cesium.Rectangle.fromDegrees(west, south, east, north);
+
+  // replace existing AQI heatmap layer with the live one
+  if (aqiHeatmap) {
+    try { viewer.imageryLayers.remove(aqiHeatmap, true); } catch {}
+    aqiHeatmap = null;
+  }
+
+  const provider = new Cesium.SingleTileImageryProvider({ url, rectangle });
+  aqiHeatmap = viewer.imageryLayers.addImageryProvider(provider);
+  aqiHeatmap.alpha = 0.45;
+  viewer.imageryLayers.raiseToTop(aqiHeatmap);
+}
+
+
+
+function updateAqiTimelineIdw(currentTime) {
+  if (!aqiTimelineIdwEnabled) return;
+  if (!window.AQI_IDW || !window.AQI_IDW.bbox) return;
+  const { bbox, power, width, height } = window.AQI_IDW;
+  const { west, east, south, north } = bbox;
+
+  // Throttle: only recompute when the hour changes
+  const d = Cesium.JulianDate.toDate(currentTime);
+  const hourKey = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')} ${String(d.getHours()).padStart(2,'0')}`;
+  if (hourKey === aqiTimelineLastHourKey) {
+    return; // same hour as last render, skip
+  }
+  aqiTimelineLastHourKey = hourKey;
+
+  // Build points for this hour from station time series
+  const points = [];
+  aqiStationEntities.forEach((entity) => {
+    const aqiNow = entity.aqiSeries && entity.aqiSeries.getValue(currentTime);
+    if (aqiNow == null || Number.isNaN(aqiNow)) return;
+
+    // get station lon/lat from its position
+    const carto = Cesium.Cartographic.fromCartesian(entity.position);
+    const lon = Cesium.Math.toDegrees(carto.longitude);
+    const lat = Cesium.Math.toDegrees(carto.latitude);
+
+    // only use stations inside bbox
+    if (lon < west || lon > east || lat < south || lat > north) return;
+
+    points.push({ lon, lat, value: aqiNow });
+  });
+
+  if (!points.length) return;
+
+  const w = width  ?? 768;
+  const h = height ?? 768;
+  const p = power  ?? 2;
+
+  const url = renderIDWHeatmap(points, { west, east, south, north }, {
+    width: w,
+    height: h,
+    power: p,
+    stops: AQI_STOPS
+  });
+
+  const rectangle = Cesium.Rectangle.fromDegrees(west, south, east, north);
+
+  // Replace current AQI heatmap with timeline one
+  if (aqiHeatmap) {
+    try { viewer.imageryLayers.remove(aqiHeatmap, true); } catch {}
+    aqiHeatmap = null;
+  }
+
+  const provider = new Cesium.SingleTileImageryProvider({ url, rectangle });
+  aqiHeatmap = viewer.imageryLayers.addImageryProvider(provider);
+  aqiHeatmap.alpha = 0.45;
+  viewer.imageryLayers.raiseToTop(aqiHeatmap);
+}
+
+
+
+    // ---------- AQI (IDW + sampling + WAQI popup) ----------
+    function enableAQIClickSampling(){
+      disableAQIClickSampling();
+      aqiClickHandler = new Cesium.ScreenSpaceEventHandler(viewer.scene.canvas);
+      aqiClickHandler.setInputAction(async (click) => {
+        const picked = viewer.scene.pick(click.position);
+        if (Cesium.defined(picked) && picked.id && picked.id._waqi) {
+          await showWaqiStationPopup(picked.id);
+          return;
+        }
+        const cart = viewer.scene.pickPosition(click.position) || viewer.camera.pickEllipsoid(click.position, viewer.scene.globe.ellipsoid);
+        if (!cart || !window.AQI_IDW) return;
+        const c = Cesium.Cartographic.fromCartesian(cart);
+        const lon = Cesium.Math.toDegrees(c.longitude);
+        const lat = Cesium.Math.toDegrees(c.latitude);
+        const val = sampleIDWAt(window.AQI_IDW, lon, lat);
+        if (val == null) return;
+
+        if (aqiProbeEntity) viewer.entities.remove(aqiProbeEntity);
+        aqiProbeEntity = viewer.entities.add({
+          position: Cesium.Cartesian3.fromDegrees(lon, lat),
+          point: { pixelSize: 10, color: Cesium.Color.WHITE, outlineColor: Cesium.Color.BLACK, outlineWidth: 2 },
+          label: {
+            text: `AQI ~ ${val.toFixed(0)}`, font: "bold 13px sans-serif",
+            fillColor: Cesium.Color.BLACK, showBackground: true,
+            backgroundColor: Cesium.Color.WHITE.withAlpha(0.9),
+            pixelOffset: new Cesium.Cartesian2(0, -18),
+            disableDepthTestDistance: Number.POSITIVE_INFINITY
+          },
+          description: `
+            <div style="font-family:system-ui;line-height:1.3">
+              <div style="font-weight:700;margin-bottom:6px;">Interpolated AQI</div>
+              <div style="font-size:28px;font-weight:800;margin-bottom:4px;">${val.toFixed(1)}</div>
+              <div><b>Location:</b> ${lat.toFixed(5)}, ${lon.toFixed(5)}</div>
+              <div style="opacity:.7;margin-top:6px;">Computed via IDW (value-only)</div>
+            </div>`
+        });
+        viewer.selectedEntity = aqiProbeEntity;
+      }, Cesium.ScreenSpaceEventType.LEFT_CLICK);
+    }
+    function disableAQIClickSampling(){
+      if (aqiClickHandler) { aqiClickHandler.destroy(); aqiClickHandler = null; }
+      if (aqiProbeEntity) { try { viewer.entities.remove(aqiProbeEntity); } catch{} aqiProbeEntity=null; }
+    }
+    
+    function setSelectedEntityDescriptionForTime(t) {
+  const e = viewer.selectedEntity;
+  if (!e || !e._waqi || !e.aqiSeries) return;
+
+  const aqiNow  = e.aqiSeries.getValue(t);
+  const tempNow = e.tempSeries && e.tempSeries.getValue(t);
+
+  const aStr = (aqiNow != null && !Number.isNaN(aqiNow)) ? aqiNow.toFixed(1) : "–";
+  const tStr = (tempNow != null && !Number.isNaN(tempNow)) ? tempNow.toFixed(1) : "–";
+
+  e.description = `
+    <table class="cesium-infoBox-defaultTable">
+      <tr><th>Station</th><td>${e.name || ""}</td></tr>
+      <tr><th>AQI</th><td>${aStr}</td></tr>
+      <tr><th>Temp (°C)</th><td>${tStr}</td></tr>
+    </table>
+  `;
+}
+
+
+    function sampleIDWAt(ctx, lon, lat){
+      const { points,bbox,power,width,height }=ctx; const { west,east,south,north }=bbox;
+      const x=(lon-west)/(east-west)*(width-1), y=(1-(lat-south)/(north-south))*(height-1);
+      let num=0,den=0; const eps=1e-6;
+      for(const p of points){
+        const px=(p.lon-west)/(east-west)*(width-1), py=(1-(p.lat-south)/(north-south))*(height-1);
+        const dx=x-px, dy=y-py, d2=dx*dx+dy*dy; if(d2<1) return p.value;
+        const w=1/Math.pow(d2+eps,power/2); num+=w*p.value; den+=w;
+      }
+      return den>0 ? num/den : null;
+    }
+    async function showWaqiStationPopup(entity){
+      viewer.selectedEntity = entity;
+      const uid = entity._waqi.uid;
+      const token = "{{ WAQI_TOKEN }}";
+      const url = `https://api.waqi.info/feed/@${uid}/?token=${token}`;
+      try{
+        const r = await fetch(url);
+        const j = await r.json();
+        if (j.status !== "ok") throw new Error("WAQI details error");
+        const d = j.data || {};
+        const iaqi = d.iaqi || {};
+        const fmt = (x, suffix='') => (x && typeof x.v !== 'undefined') ? `${x.v}${suffix}` : '—';
+        entity.description = `
+          <div style="font-family:system-ui;line-height:1.35">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+              <div style="font-weight:800">${d.city?.name || entity.name || 'Station'}</div>
+              <div style="font-size:22px;font-weight:900;">AQI ${d.aqi ?? entity._waqi.aqi ?? '—'}</div>
+            </div>
+            <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;">
+              ${['pm25','pm10','o3','no2','so2','co','t','h','w'].map(key => {
+                const lab = {pm25:'PM2.5',pm10:'PM10',o3:'O₃',no2:'NO₂',so2:'SO₂',co:'CO',t:'Temp',h:'Humidity',w:'Wind'}[key];
+                const suf = {t:'°C',h:'%',w:' m/s'}[key] || '';
+                return `<div style="background:#0f172a;color:#e2e8f0;padding:8px;border-radius:8px"><div style="opacity:.7;">${lab}</div><div style="font-weight:800">${fmt(iaqi[key],suf)}</div></div>`;
+              }).join('')}
+            </div>
+            <div style="margin-top:8px;opacity:.7;">Dominant pollutant: ${d.dominentpol ?? '—'} · Time: ${d.time?.s ?? '—'}</div>
+          </div>`;
+      }catch(e){
+        entity.description = `<div style="font-family:system-ui;color:#ef4444">Failed to load station details.</div>`;
+        console.error(e);
+      }
+    }
+
+
+        function wireTimelineToggle() {
+      const chk = document.getElementById('chkTimelineMode');
+      if (!chk) return;
+
+      chk.addEventListener('change', async (e) => {
+        if (e.target.checked) {
+          await enableTimelineMode();
+        } else {
+          disableTimelineMode();
+        }
+      });
+    }
+    async function enableTimelineMode() {
+      if (timelineMode) return;
+      timelineMode = true;
+
+      // Make sure we have live AQI points to attach series to
+      const hasWaqiPoints = viewer.entities.values.some(e => e._waqi);
+      if (!hasWaqiPoints) {
+        await flyToLondon();
+        await loadAQI();   // create live AQI markers (and heatmap)
+      }
+
+      // Configure clock + left-panel text (avg AQI & Temp)
+      await setupAqiTimeline(viewer);
+
+      // Attach per-station time series (AQI + temp) to those markers
+      await setupAqiStationTimeSeries(viewer);
+      aqiTimelineIdwEnabled = true;
+      aqiTimelineLastHourKey = null;
+
+    }
+
+    function disableTimelineMode() {
+      if (!timelineMode) return;
+      timelineMode = false;
+
+      const clock = viewer.clock;
+
+      // Stop animation and reset clock to "now"
+      const now = Cesium.JulianDate.now();
+      clock.shouldAnimate = false;
+      clock.startTime = now.clone();
+      clock.stopTime = now.clone();
+      clock.currentTime = now.clone();
+      clock.clockRange = Cesium.ClockRange.UNBOUNDED;
+      clock.multiplier = 1.0;
+
+      // Remove clock tick handlers for timeline
+      if (overviewTimelineTickHandler) {
+        viewer.clock.onTick.removeEventListener(overviewTimelineTickHandler);
+        overviewTimelineTickHandler = null;
+      }
+      if (stationTimelineTickHandler) {
+        viewer.clock.onTick.removeEventListener(stationTimelineTickHandler);
+        stationTimelineTickHandler = null;
+      }
+
+      aqiTimelineIdwEnabled = false;
+      aqiTimelineLastHourKey = null;
+
+// restore the live IDW heatmap from cached live points
+restoreLiveAqiIdwFromCache();
+
+      // Restore live AQI label/color for each station (using _waqi.aqi)
+      viewer.entities.values.forEach((entity) => {
+        if (entity._waqi && entity.label && entity.point) {
+          const liveAqi = entity._waqi.aqi;
+          if (typeof liveAqi === "number" && !Number.isNaN(liveAqi)) {
+            entity.label.text = liveAqi.toString();
+            entity.point.color = getAqiColor(liveAqi);
+          }
+        }
+      });
+
+      // Reset the timeseries widget to show "live" snapshot (very simple)
+      const timeEl = document.getElementById("ts-time");
+      const aqiEl = document.getElementById("ts-aqi");
+      const tempEl = document.getElementById("ts-temp");
+      if (timeEl) timeEl.textContent = "Live";
+      if (aqiEl) aqiEl.textContent = "–";
+      if (tempEl) tempEl.textContent = "–";
+    }
+
+
+    async function loadAQI() {
+      const API_KEY = "{{ WAQI_TOKEN }}";
+      const bboxStr = "{{ WAQI_BBOX }}"; // "south,west,north,east"
+      let south=51.3, west=-0.5, north=51.7, east=0.3;
+      if (bboxStr && bboxStr.split(',').length === 4) {
+        const [s,w,n,e] = bboxStr.split(',').map(parseFloat);
+        if ([s,w,n,e].every(v => !isNaN(v))) { south=s; west=w; north=n; east=e; }
+      }
+      const bboxUrl = `https://api.waqi.info/map/bounds/?token=${API_KEY}&latlng=${south},${west},${north},${east}`;
+
+      const res = await fetch(bboxUrl); const data = await res.json();
+      if (data.status !== "ok") { console.error("AQI API error:", data); return; }
+
+      const points = [];
+      for (const st of data.data) {
+        const aqi = parseInt(st.aqi);
+        if (isNaN(aqi) || aqi < 0) continue;
+        points.push({ lon: st.lon, lat: st.lat, value: aqi });
+
+        const colorCss = (aqi<=50) ? "#009966" : (aqi<=100) ? "#ffde33" : (aqi<=150) ? "#ff9933" :
+                         (aqi<=200) ? "#cc0033" : (aqi<=300) ? "#660099" : "#7e0023";
+        const color = Cesium.Color.fromCssColorString(colorCss);
+        const ent = viewer.entities.add({
+          position: Cesium.Cartesian3.fromDegrees(st.lon, st.lat),
+          point: { pixelSize: 10, color, outlineColor: Cesium.Color.WHITE, outlineWidth: 1 },
+          label: {
+            text: aqi.toString(), font: "bold 12px sans-serif", fillColor: Cesium.Color.BLACK,
+            showBackground: true, backgroundColor: color.withAlpha(0.85),
+            pixelOffset: new Cesium.Cartesian2(0, -18), disableDepthTestDistance: Number.POSITIVE_INFINITY
+          },
+          name: st.station?.name || "AQI Station"
+        });
+        ent._waqi = { uid: st.uid, aqi, name: st.station?.name || null };
+      }
+
+      if (points.length) {
+        const width=768,height=768,power=2;
+        const url = renderIDWHeatmap(points, { west, east, south, north }, { width, height, power, stops: AQI_STOPS });
+        const rectangle = Cesium.Rectangle.fromDegrees(west, south, east, north);
+        const provider  = new Cesium.SingleTileImageryProvider({ url, rectangle });
+        aqiHeatmap = viewer.imageryLayers.addImageryProvider(provider);
+        aqiHeatmap.alpha = 0.45;
+        viewer.imageryLayers.raiseToTop(aqiHeatmap);
+
+        window.AQI_IDW = { points, bbox: { west, east, south, north }, power, width, height };
+      }
+
+      enableAQIClickSampling();
+      console.log("[AQI] stations:", points.length);
+    }
+
+
+    let tempProbeEntity = null;
+    let bikesProbeEntity = null;
+    let bikesClickHandler = null;
+    // ---------- Temperature (IDW + time-series bar chart on click) ----------
+function disableTempClickCharts(){
+  if (tempClickHandler){ tempClickHandler.destroy(); tempClickHandler=null; }
+  if (tempProbeEntity){ try { viewer.entities.remove(tempProbeEntity); } catch{} tempProbeEntity=null; }
+}
+
+function enableTempClickCharts(){
+  disableTempClickCharts();
+  tempClickHandler = new Cesium.ScreenSpaceEventHandler(viewer.scene.canvas);
+  tempClickHandler.setInputAction(async (click) => {
+    const picked = viewer.scene.pick(click.position);
+
+    // 1) If a temperature station is clicked -> fetch & show time series bar chart
+    if (Cesium.defined(picked) && picked.id && picked.id._temp) {
+      const ent = picked.id;
+      const { lat, lon } = ent._temp;
+      ent.description = `<div style="font-family:system-ui">Loading time series…</div>`;
+      viewer.selectedEntity = ent;
+
+      try{
+        const series = await fetchTempSeries(lat, lon);
+        const svg = buildTempBarChartSVG(series.times, series.values);
+        ent.description = `
+          <div style="font-family:system-ui;line-height:1.35">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+              <div style="font-weight:800">${ent.name || 'Temperature'}</div>
+              <div style="opacity:.8">${lat.toFixed(4)}, ${lon.toFixed(4)}</div>
+            </div>
+            ${svg}
+          </div>`;
+      }catch(e){
+        ent.description = `<div style="font-family:system-ui;color:#ef4444">Failed to load time series.</div>`;
+        console.error(e);
+      }
+      return;
+    }
+
+    // 2) Else: sample the temperature IDW at the click location
+    if (!window.TEMP_IDW) return;
+    const cart = viewer.scene.pickPosition(click.position) || viewer.camera.pickEllipsoid(click.position, viewer.scene.globe.ellipsoid);
+    if (!cart) return;
+    const c = Cesium.Cartographic.fromCartesian(cart);
+    const lon = Cesium.Math.toDegrees(c.longitude);
+    const lat = Cesium.Math.toDegrees(c.latitude);
+    const val = sampleIDWAt(window.TEMP_IDW, lon, lat);
+    if (val == null) return;
+
+    if (tempProbeEntity) viewer.entities.remove(tempProbeEntity);
+    tempProbeEntity = viewer.entities.add({
+      position: Cesium.Cartesian3.fromDegrees(lon, lat),
+      point: { pixelSize: 10, color: Cesium.Color.WHITE, outlineColor: Cesium.Color.BLACK, outlineWidth: 2 },
+      label: {
+        text: `Temp ~ ${val.toFixed(1)}°C`,
+        font: "bold 13px sans-serif",
+        fillColor: Cesium.Color.BLACK,
+        showBackground: true,
+        backgroundColor: Cesium.Color.WHITE.withAlpha(0.9),
+        pixelOffset: new Cesium.Cartesian2(0, -18),
+        disableDepthTestDistance: Number.POSITIVE_INFINITY
+      },
+      description: `
+        <div style="font-family:system-ui;line-height:1.3">
+          <div style="font-weight:700;margin-bottom:6px;">Interpolated Temperature</div>
+          <div style="font-size:28px;font-weight:800;margin-bottom:4px;">${val.toFixed(1)} °C</div>
+          <div><b>Location:</b> ${lat.toFixed(5)}, ${lon.toFixed(5)}</div>
+          <div style="opacity:.7;margin-top:6px;">Computed via IDW (value-only)</div>
+        </div>`
+    });
+    viewer.selectedEntity = tempProbeEntity;
+  }, Cesium.ScreenSpaceEventType.LEFT_CLICK);
+}
+
+    
+    async function fetchTempSeries(lat, lon){
+      const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&hourly=temperature_2m&past_days=1&forecast_days=1&timezone=auto`;
+      const r = await fetch(url);
+      if (!r.ok) throw new Error("Open-Meteo error");
+      const j = await r.json();
+      const h = j?.hourly; if (!h?.time || !h?.temperature_2m) throw new Error("No hourly data");
+      // use the last 24 hours (or all if less)
+      const n = h.time.length;
+      const start = Math.max(0, n - 24);
+      return { times: h.time.slice(start), values: h.temperature_2m.slice(start) };
+    }
+    function buildTempBarChartSVG(timesISO, temps){
+      const W=640, H=260, m={l:42,r:10,t:10,b:26}, iw=W-m.l-m.r, ih=H-m.t-m.b;
+      const min = Math.min(...temps), max = Math.max(...temps);
+      const pad = Math.max(1, (max-min)*0.1);
+      const vmin = Math.floor(min - pad), vmax = Math.ceil(max + pad);
+      const n = temps.length, gap = 2;
+      const bw = Math.max(1, Math.floor((iw - gap*(n-1)) / n));
+      const x = i => m.l + i*(bw+gap);
+      const y = v => m.t + ih - ((v - vmin) / (vmax - vmin)) * ih;
+
+      const toRGB = makeValueToRGB(TEMP_STOPS);
+      const bars = temps.map((v,i) => {
+        const {r,g,b} = toRGB(v);
+        const _x=x(i), _y=y(v), h=Math.max(1, m.t+ih - _y);
+        return `<rect x="${_x}" y="${_y}" width="${bw}" height="${h}" fill="rgb(${r},${g},${b})" />`;
+      }).join('');
+
+      // x labels every 3rd hour
+      const labels = temps.map((_,i) => {
+        if (i%3) return '';
+        const d=new Date(timesISO[i]); const hh=String(d.getHours()).padStart(2,'0');
+        return `<text x="${x(i)+bw/2}" y="${H-6}" font-size="10" text-anchor="middle" fill="#e5e7eb">${hh}</text>`;
+      }).join('');
+
+      // y axis ticks
+      const yTicks = [];
+      const steps = 4;
+      for (let i=0;i<=steps;i++){
+        const v = vmin + (i/steps)*(vmax-vmin);
+        const yy = y(v);
+        yTicks.push(
+          `<line x1="${m.l-4}" y1="${yy}" x2="${W-m.r}" y2="${yy}" stroke="#334155" stroke-width="1" opacity="0.4"/>`+
+          `<text x="${m.l-8}" y="${yy+3}" font-size="10" text-anchor="end" fill="#cbd5e1">${v.toFixed(0)}°</text>`
+        );
+      }
+
+      return `
+        <svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" style="background:#0b1220;border-radius:8px">
+          <rect x="0" y="0" width="${W}" height="${H}" fill="#0b1220"/>
+          ${yTicks.join('')}
+          ${bars}
+          ${labels}
+        </svg>
+      `;
+    }
+
+    async function loadTemperature() {
+      const API_KEY = "{{ WAQI_TOKEN }}";
+      const bboxStr = "{{ WAQI_BBOX }}";
+      let south=51.3, west=-0.5, north=51.7, east=0.3;
+      if (bboxStr && bboxStr.split(',').length === 4) {
+        const [s,w,n,e] = bboxStr.split(',').map(parseFloat);
+        if ([s,w,n,e].every(v => !isNaN(v))) { south=s; west=w; north=n; east=e; }
+      }
+      const bboxUrl = `https://api.waqi.info/map/bounds/?token=${API_KEY}&latlng=${south},${west},${north},${east}`;
+
+      const stRes = await fetch(bboxUrl);
+      const stJson = await stRes.json();
+      if (stJson.status !== "ok") { console.error("WAQI stations fetch failed for temperature:", stJson); return; }
+
+      // fetch latest temp for each station (concurrency-limited)
+      const stations = stJson.data;
+      const points = [];
+      let i=0; const limit=6;
+      const workers = Array.from({length: limit}).map(async () => {
+        while(i < stations.length){
+          const st = stations[i++];
+          try{
+            const r = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${st.lat}&longitude=${st.lon}&hourly=temperature_2m&timezone=auto`);
+            if (!r.ok) continue;
+            const j = await r.json();
+            const h = j?.hourly; if (!h?.time || !h?.temperature_2m) continue;
+            const idx = h.time.length - 1;
+            const tempC = h.temperature_2m[idx];
+            if (typeof tempC !== "number") continue;
+
+            // marker
+            const color = (tempC<5)?Cesium.Color.fromCssColorString("#3b82f6")
+                        :(tempC<15)?Cesium.Color.fromCssColorString("#22c55e")
+                        :(tempC<25)?Cesium.Color.fromCssColorString("#f59e0b")
+                                   :Cesium.Color.fromCssColorString("#ef4444");
+            const ent = viewer.entities.add({
+              position: Cesium.Cartesian3.fromDegrees(st.lon, st.lat),
+              point: { pixelSize: 10, color, outlineColor: Cesium.Color.WHITE, outlineWidth: 1 },
+              label: {
+                text: `${tempC.toFixed(1)}°C`,
+                font: "bold 12px sans-serif",
+                fillColor: Cesium.Color.BLACK,
+                showBackground: true,
+                backgroundColor: color.withAlpha(0.85),
+                pixelOffset: new Cesium.Cartesian2(0, -18),
+                disableDepthTestDistance: Number.POSITIVE_INFINITY
+              },
+              name: "Temperature station"
+            });
+            ent._temp = { lat: st.lat, lon: st.lon };
+
+            // IDW point
+            points.push({ lon: st.lon, lat: st.lat, value: tempC });
+          }catch(e){ /* ignore station errors */ }
+        }
+      });
+      await Promise.all(workers);
+
+      // IDW overlay (temp)
+      if (points.length){
+        const width=768,height=768,power=2;
+        const url = renderIDWHeatmap(points, { west, east, south, north }, { width, height, power, stops: TEMP_STOPS });
+        const rectangle = Cesium.Rectangle.fromDegrees(west, south, east, north);
+        const provider  = new Cesium.SingleTileImageryProvider({ url, rectangle });
+        tempHeatmap = viewer.imageryLayers.addImageryProvider(provider);
+        tempHeatmap.alpha = 0.45;
+        viewer.imageryLayers.raiseToTop(tempHeatmap);
+
+        window.TEMP_IDW = { points, bbox:{west,east,south,north}, power, width, height };
+      }
+
+      // enable click-to-open time series
+      enableTempClickCharts();
+      console.log("[TEMP] stations plotted:", points.length);
+    }
+
+    // ---------- Bikes (TfL) with IDW of availability ratio ----------
+
+
+
+    function disableBikeClickSampling(){
+  if (bikesClickHandler){ bikesClickHandler.destroy(); bikesClickHandler=null; }
+  if (bikesProbeEntity){ try { viewer.entities.remove(bikesProbeEntity); } catch{} bikesProbeEntity=null; }
+}
+
+function enableBikeClickSampling(){
+  disableBikeClickSampling();
+  bikesClickHandler = new Cesium.ScreenSpaceEventHandler(viewer.scene.canvas);
+  bikesClickHandler.setInputAction((click) => {
+    // If a BikePoint entity was clicked, let Cesium's default selection show its description
+    const picked = viewer.scene.pick(click.position);
+    if (Cesium.defined(picked) && picked.id && !picked.id._temp && !picked.id._waqi) {
+      return; // default popup for bike entity will show
+    }
+
+    // Otherwise sample the bikes IDW raster
+    if (!window.BIKES_IDW) return;
+    const cart = viewer.scene.pickPosition(click.position) || viewer.camera.pickEllipsoid(click.position, viewer.scene.globe.ellipsoid);
+    if (!cart) return;
+    const c = Cesium.Cartographic.fromCartesian(cart);
+    const lon = Cesium.Math.toDegrees(c.longitude);
+    const lat = Cesium.Math.toDegrees(c.latitude);
+    const val = sampleIDWAt(window.BIKES_IDW, lon, lat); // 0..100 (%)
+    if (val == null) return;
+
+    if (bikesProbeEntity) viewer.entities.remove(bikesProbeEntity);
+    bikesProbeEntity = viewer.entities.add({
+      position: Cesium.Cartesian3.fromDegrees(lon, lat),
+      point: { pixelSize: 10, color: Cesium.Color.WHITE, outlineColor: Cesium.Color.BLACK, outlineWidth: 2 },
+      label: {
+        text: `Avail ~ ${val.toFixed(0)}%`,
+        font: "bold 13px sans-serif",
+        fillColor: Cesium.Color.BLACK,
+        showBackground: true,
+        backgroundColor: Cesium.Color.WHITE.withAlpha(0.9),
+        pixelOffset: new Cesium.Cartesian2(0, -18),
+        disableDepthTestDistance: Number.POSITIVE_INFINITY
+      },
+      description: `
+        <div style="font-family:system-ui;line-height:1.3">
+          <div style="font-weight:700;margin-bottom:6px;">Interpolated Bike Availability</div>
+          <div style="font-size:28px;font-weight:800;margin-bottom:4px;">${val.toFixed(0)}%</div>
+          <div><b>Location:</b> ${lat.toFixed(5)}, ${lon.toFixed(5)}</div>
+          <div style="opacity:.7;margin-top:6px;">Computed via IDW (value-only)</div>
+        </div>`
+    });
+    viewer.selectedEntity = bikesProbeEntity;
+  }, Cesium.ScreenSpaceEventType.LEFT_CLICK);
+}
+
+
+    async function loadBikes() {
+      // clear is already called before loader, but safe to keep logic simple
+      const url = "https://api.tfl.gov.uk/BikePoint";
+      let data = [];
+      try {
+        const res = await fetch(url);
+        if (!res.ok) throw new Error(`TfL API HTTP ${res.status}`);
+        data = await res.json();
+      } catch (e) {
+        console.error("Failed to load TfL BikePoint:", e);
+        alert("Could not fetch TfL BikePoint data. See console for details.");
+        return;
+      }
+
+      const getCount = (props, key) => {
+        const p = (props || []).find(x => x.key === key);
+        const v = p && (p.value ?? p.val ?? p.defaultValue);
+        const n = parseInt(String(v), 10);
+        return isNaN(n) ? 0 : n;
+      };
+
+      const points = [];
+      let west=  999, east=-999, south=  999, north=-999;
+
+      data.forEach(bp => {
+        const lat = parseFloat(bp.lat), lon = parseFloat(bp.lon);
+        if (isNaN(lat) || isNaN(lon)) return;
+
+        south = Math.min(south, lat); north = Math.max(north, lat);
+        west  = Math.min(west,  lon); east  = Math.max(east,  lon);
+
+        const props = bp.additionalProperties || [];
+        const bikes = getCount(props, "NbBikes");
+        const empty = getCount(props, "NbEmptyDocks");
+        const docks = getCount(props, "NbDocks") || (bikes + empty);
+
+        const ratio = docks > 0 ? (bikes / docks) : 0; // 0..1
+        const pct = ratio * 100;
+
+        let color = Cesium.Color.GRAY;
+        if (ratio >= 0.66) color = Cesium.Color.fromCssColorString("#22c55e");
+        else if (ratio >= 0.33) color = Cesium.Color.fromCssColorString("#eab308");
+        else color = Cesium.Color.fromCssColorString("#ef4444");
+
+        const name = bp.commonName || bp.id;
+        viewer.entities.add({
+          position: Cesium.Cartesian3.fromDegrees(lon, lat),
+          point: { pixelSize: 8, color, outlineColor: Cesium.Color.BLACK, outlineWidth: 1 },
+          label: {
+            text: bikes.toString(),
+            font: "bold 12px sans-serif",
+            fillColor: Cesium.Color.WHITE,
+            showBackground: true,
+            backgroundColor: Cesium.Color.BLACK.withAlpha(0.6),
+            pixelOffset: new Cesium.Cartesian2(0, -16),
+            disableDepthTestDistance: Number.POSITIVE_INFINITY
+          },
+          description: `<b>${name}</b><br/><b>Available bikes:</b> ${bikes}<br/><b>Empty docks:</b> ${empty}<br/><b>Total docks:</b> ${docks}<br/><b>Availability:</b> ${(pct).toFixed(0)}%`
+        });
+
+        points.push({ lon, lat, value: pct });
+      });
+
+      // pad bbox slightly
+      if (west < east && south < north){
+        const padLon = (east - west) * 0.05, padLat = (north - south) * 0.05;
+        west -= padLon; east += padLon; south -= padLat; north += padLat;
+
+        const width=768,height=768,power=2;
+        const url = renderIDWHeatmap(points, { west, east, south, north }, { width, height, power, stops: BIKES_STOPS });
+        const rectangle = Cesium.Rectangle.fromDegrees(west, south, east, north);
+        const provider  = new Cesium.SingleTileImageryProvider({ url, rectangle });
+        bikesHeatmap = viewer.imageryLayers.addImageryProvider(provider);
+        bikesHeatmap.alpha = 0.45;
+        viewer.imageryLayers.raiseToTop(bikesHeatmap);
+
+        window.BIKES_IDW = { points, bbox:{west,east,south,north}, power, width, height };
+        enableBikeClickSampling();
+
+      }
+
+      console.log(`[BIKES] plotted ${data.length} BikePoints; IDW cells: 768×768`);
+    }
+
+    // ---------- DSM (Cesium ion) ----------
+    const DSM_ASSET_ID = 3557552;
+    const DSM_TOKEN = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiIzYTdmNGJjZS0yNzczLTQ2YzQtYTljOS03NmMwNzlkOWY4ZTAiLCJpZCI6MzE5NDk2LCJpYXQiOjE3NTE5NTk1Nzh9.SYVKEBbV-N8UeuAubHTDjLQtZEtznHNCkMSrPOctCLc";
+    async function loadDSM() {
+      try { if (Cesium.Ion && DSM_TOKEN) Cesium.Ion.defaultAccessToken = DSM_TOKEN; } catch {}
+      try {
+        if (Cesium.Terrain && typeof Cesium.Terrain.fromIonAssetId === "function") {
+          viewer.terrain = await Cesium.Terrain.fromIonAssetId(DSM_ASSET_ID, { accessToken: DSM_TOKEN });
+          await flyToLondonObliqueDSM(); return;
+        } else if (Cesium.CesiumTerrainProvider && typeof Cesium.CesiumTerrainProvider.fromIonAssetId === "function") {
+          const tp = await Cesium.CesiumTerrainProvider.fromIonAssetId(DSM_ASSET_ID, { accessToken: DSM_TOKEN });
+          if (Cesium.Terrain?.fromProvider) viewer.terrain = Cesium.Terrain.fromProvider({ terrainProvider: tp });
+          else viewer.terrainProvider = tp;
+          await flyToLondon(); return;
+        }
+      } catch (e) { console.warn("[DSM] Terrain load failed, trying imagery...", e); }
+
+      try {
+        const imgProv = await Cesium.IonImageryProvider.fromAssetId(DSM_ASSET_ID, { accessToken: DSM_TOKEN });
+        dsmLayer = viewer.imageryLayers.addImageryProvider(imgProv);
+        viewer.imageryLayers.raiseToTop(dsmLayer);
+        await flyToLondon(); return;
+      } catch (e) { console.warn("[DSM] Imagery load failed, trying 3D Tiles...", e); }
+
+      try {
+        dsmTileset = await Cesium.Cesium3DTileset.fromIonAssetId(DSM_ASSET_ID, { accessToken: DSM_TOKEN });
+        viewer.scene.primitives.add(dsmTileset);
+        await viewer.zoomTo(dsmTileset);
+        await flyToLondonObliqueDSM(); return;
+      } catch (e) {
+        console.error("[DSM] Could not load DSM.", e);
+        alert("Could not load DSM asset from Cesium ion.");
+      }
+    }
+    function flyToLondonObliqueDSM() {
+      const lon=-0.1276, lat=51.5072;
+      return viewer.camera.flyTo({
+        destination: Cesium.Cartesian3.fromDegrees(lon, lat, 5000),
+        orientation: { heading: Cesium.Math.toRadians(30), pitch: Cesium.Math.toRadians(-35), roll: 0.0 },
+        duration: 1.6
+      });
+    }
+
+    // ---------- Photorealistic & OSM ----------
+    function flyToLondonObliqueCity() {
+      const lon = -0.1696985, lat = 51.4843075;
+      return viewer.camera.flyTo({
+        destination: Cesium.Cartesian3.fromDegrees(lon, lat, 700),
+        orientation: { heading: Cesium.Math.toRadians(0), pitch: Cesium.Math.toRadians(-35), roll: 0.0 },
+        duration: 1.6
+      });
+    }
+    async function loadPhotorealistic() {
+      try {
+        if (typeof Cesium.createGooglePhotorealistic3DTileset !== "function") throw new Error("createGooglePhotorealistic3DTileset not available");
+        googleTileset = await Cesium.createGooglePhotorealistic3DTileset();
+        viewer.scene.primitives.add(googleTileset);
+        await flyToLondonObliqueCity();
+        console.log("[PHOTO] Google Photorealistic 3D Tiles added.");
+      } catch (e) { console.error("Photorealistic load failed:", e); alert("Could not load Google Photorealistic 3D Tiles."); }
+    }
+    async function loadOSM() {
+      try {
+        if (typeof Cesium.createOsmBuildingsAsync !== "function") throw new Error("createOsmBuildingsAsync not available");
+        osmBuildings = await Cesium.createOsmBuildingsAsync();
+        viewer.scene.primitives.add(osmBuildings);
+        await flyToLondonObliqueCity();
+        console.log("[OSM] OSM Buildings added.");
+      } catch (e) { console.error("OSM Buildings load failed:", e); alert("Could not load OSM Buildings."); }
+    }
+
+    // ---------- Layer registry ----------
+    const LAYERS = {
+      async DSM() { await loadDSM(); },
+      async BIKES() { await flyToLondon(); await loadBikes(); },
+      async AQI()  { await flyToLondon(); await loadAQI();  },
+      async TEMP() { await flyToLondon(); await loadTemperature(); },
+      async PHOTOREALISTIC() { await loadPhotorealistic(); },
+      async OSM() { await loadOSM(); },
+    };
+
+
+
+    // How many hours of history to show on the Timeline
+const HOURS_BACK_FOR_TIMELINE = 48; // keep same as setupAqiTimeline
+const aqiStationEntities = new Map(); // uid -> entity
+
+    // async function setupAqiStationTimeSeries(viewer) {
+    //   try {
+    //     const resp = await fetch(`/api/aqi/stations/hourly/?hours=${HOURS_BACK_FOR_TIMELINE}`);
+    //     if (!resp.ok) {
+    //       console.error("Failed to load station hourly data", resp.status, resp.statusText);
+    //       return;
+    //     }
+    //     const data = await resp.json();
+    //     const stations = data.stations || [];
+
+    //     // Attach SampledProperties to EXISTING AQI entities (if possible)
+    //     stations.forEach((s) => {
+    //       const uid = s.uid;
+
+    //       let entity = null;
+
+    //       // 1) Try to find an existing live AQI entity by WAQI uid
+    //       const all = viewer.entities.values;
+    //       for (let i = 0; i < all.length; i++) {
+    //         const e = all[i];
+    //         if (e._waqi && e._waqi.uid === uid) {
+    //           entity = e;
+    //           break;
+    //         }
+    //       }
+
+    //       // 2) Fallback: create a new entity if not found (rare)
+    //       if (!entity) {
+    //         const id = `aqi-station-${uid}`;
+    //         entity = viewer.entities.getById(id);
+    //         if (!entity) {
+    //           entity = viewer.entities.add({
+    //             id,
+    //             position: Cesium.Cartesian3.fromDegrees(s.lon, s.lat),
+    //             point: {
+    //               pixelSize: 12,
+    //               color: Cesium.Color.WHITE,
+    //               outlineColor: Cesium.Color.BLACK,
+    //               outlineWidth: 1
+    //             },
+    //             label: {
+    //               text: "",
+    //               font: "14px sans-serif",
+    //               pixelOffset: new Cesium.Cartesian2(0, -18),
+    //               disableDepthTestDistance: Number.POSITIVE_INFINITY,
+    //               showBackground: true
+    //             }
+    //           });
+    //         }
+    //       }
+
+    //       const aqiSeries = new Cesium.SampledProperty(Number);
+    //       const tempSeries = new Cesium.SampledProperty(Number);
+
+    //       for (let i = 0; i < s.times.length; i++) {
+    //         const time = Cesium.JulianDate.fromIso8601(s.times[i]);
+    //         const aqi = s.aqi[i];
+    //         const temp = s.temp[i];
+
+    //         if (typeof aqi === "number" && !Number.isNaN(aqi)) {
+    //           aqiSeries.addSample(time, aqi);
+    //         }
+    //         if (typeof temp === "number" && !Number.isNaN(temp)) {
+    //           tempSeries.addSample(time, temp);
+    //         }
+    //       }
+
+    //       aqiSeries.setInterpolationOptions({
+    //         interpolationDegree: 1,
+    //         interpolationAlgorithm: Cesium.LinearApproximation
+    //       });
+    //       tempSeries.setInterpolationOptions({
+    //         interpolationDegree: 1,
+    //         interpolationAlgorithm: Cesium.LinearApproximation
+    //       });
+
+    //       entity.aqiSeries = aqiSeries;
+    //       entity.tempSeries = tempSeries;
+
+    //       aqiStationEntities.set(uid, entity);
+    //     });
+
+    //     // Register a SINGLE clock handler to update all stations
+    //     if (!stationTimelineTickHandler) {
+    //       stationTimelineTickHandler = function(clock) {
+    //         const t = clock.currentTime;
+
+    //         aqiStationEntities.forEach((entity) => {
+    //           const aqiNow = entity.aqiSeries && entity.aqiSeries.getValue(t);
+    //           const tempNow = entity.tempSeries && entity.tempSeries.getValue(t);
+
+    //           if (aqiNow != null && !Number.isNaN(aqiNow)) {
+    //             entity.label.text = Math.round(aqiNow).toString();
+    //             entity.point.color = getAqiColor(aqiNow);
+    //           } else {
+    //             entity.label.text = "";
+    //             entity.point.color = Cesium.Color.GRAY;
+    //           }
+
+    //           const aStr = (aqiNow != null && !Number.isNaN(aqiNow)) ? aqiNow.toFixed(1) : "–";
+    //           const tStr = (tempNow != null && !Number.isNaN(tempNow)) ? tempNow.toFixed(1) : "–";
+
+    //           entity.description = `
+    //             <table class="cesium-infoBox-defaultTable">
+    //               <tr><th>Station</th><td>${entity.name || ""}</td></tr>
+    //               <tr><th>AQI</th><td>${aStr}</td></tr>
+    //               <tr><th>Temp (°C)</th><td>${tStr}</td></tr>
+    //             </table>
+    //           `;
+    //         });
+    //       };
+
+    //       viewer.clock.onTick.addEventListener(stationTimelineTickHandler);
+    //     }
+
+    //   } catch (err) {
+    //     console.error("Error in setupAqiStationTimeSeries:", err);
+    //   }
+    // }
+
+
+    function setSelectedEntityDescriptionForTime(t) {
+  const e = viewer.selectedEntity;
+  if (!e || !e.aqiSeries) return;   // only stations have aqiSeries
+
+  const aqiNow  = e.aqiSeries.getValue(t);
+  const tempNow = e.tempSeries && e.tempSeries.getValue(t);
+
+  const aStr = (aqiNow != null && !Number.isNaN(aqiNow)) ? aqiNow.toFixed(1) : "–";
+  const tStr = (tempNow != null && !Number.isNaN(tempNow)) ? tempNow.toFixed(1) : "–";
+
+  e.description = `
+    <table class="cesium-infoBox-defaultTable">
+      <tr><th>Station</th><td>${e.name || ""}</td></tr>
+      <tr><th>AQI</th><td>${aStr}</td></tr>
+      <tr><th>Temp (°C)</th><td>${tStr}</td></tr>
+    </table>
+  `;
+}
+
+
+    async function setupAqiStationTimeSeries(viewer) {
+  try {
+    const resp = await fetch(`/api/aqi/stations/hourly/?hours=${HOURS_BACK_FOR_TIMELINE}`);
+    if (!resp.ok) {
+      console.error("Failed to load station hourly data", resp.status, resp.statusText);
+      return;
+    }
+    const data = await resp.json();
+    const stations = data.stations || [];
+
+    // reset mapping each time we (re)build the time series
+    aqiStationEntities.clear();
+
+    stations.forEach((s) => {
+      const uid = s.uid;
+
+      // 1) ONLY use existing live WAQI entities
+      let entity = null;
+      const all = viewer.entities.values;
+      for (let i = 0; i < all.length; i++) {
+        const e = all[i];
+        if (e._waqi && e._waqi.uid === uid) {
+          entity = e;
+          break;
+        }
+      }
+
+      // If there is no live WAQI entity for this station, skip it.
+      if (!entity) {
+        return; // <-- no fallback, avoids extra sensor locations
+      }
+
+      const aqiSeries = new Cesium.SampledProperty(Number);
+      const tempSeries = new Cesium.SampledProperty(Number);
+
+      for (let i = 0; i < s.times.length; i++) {
+        const time = Cesium.JulianDate.fromIso8601(s.times[i]);
+        const aqi = s.aqi[i];
+        const temp = s.temp[i];
+
+        if (typeof aqi === "number" && !Number.isNaN(aqi)) {
+          aqiSeries.addSample(time, aqi);
+        }
+        if (typeof temp === "number" && !Number.isNaN(temp)) {
+          tempSeries.addSample(time, temp);
+        }
+      }
+
+      aqiSeries.setInterpolationOptions({
+        interpolationDegree: 1,
+        interpolationAlgorithm: Cesium.LinearApproximation
+      });
+      tempSeries.setInterpolationOptions({
+        interpolationDegree: 1,
+        interpolationAlgorithm: Cesium.LinearApproximation
+      });
+
+      entity.aqiSeries = aqiSeries;
+      entity.tempSeries = tempSeries;
+
+      aqiStationEntities.set(uid, entity);
+    });
+
+    // Register a SINGLE clock handler to update all stations (if not already)
+        if (!stationTimelineTickHandler) {
+let lastTickUpdateTime = null;
+
+stationTimelineTickHandler = function(clock) {
+  const t = clock.currentTime;
+
+  // Throttle: run heavy updates at most once per 1 second of timeline time
+  if (lastTickUpdateTime) {
+    const dt = Math.abs(Cesium.JulianDate.secondsDifference(t, lastTickUpdateTime));
+    if (dt < 1) return;
+  }
+  lastTickUpdateTime = t.clone();
+
+  // Update stations (lightweight)
+  aqiStationEntities.forEach((entity) => {
+    const aqiNow  = entity.aqiSeries && entity.aqiSeries.getValue(t);
+    const tempNow = entity.tempSeries && entity.tempSeries.getValue(t);
+
+    // Only update if value actually changed (reduces DOM/GC pressure)
+    const aqiRounded = (aqiNow != null && !Number.isNaN(aqiNow)) ? Math.round(aqiNow) : null;
+
+    if (entity._lastAqiRounded !== aqiRounded) {
+      entity._lastAqiRounded = aqiRounded;
+
+      if (aqiRounded != null) {
+        entity.label.text = aqiRounded.toString();
+        entity.point.color = getAqiColor(aqiRounded);
+      } else {
+        entity.label.text = "";
+        entity.point.color = Cesium.Color.GRAY;
+      }
+    }
+
+    // DO NOT set entity.description every tick (major perf killer)
+    // Only update it when station is selected (see Patch 2)
+  });
+
+  // Heatmap update is already throttled by hourKey inside updateAqiTimelineIdw
+  updateAqiTimelineIdw(t);
+
+  // Also update your left panel timeline widget once per tick-throttle
+  updateTimelineWidget(t);
+    setSelectedEntityDescriptionForTime(t);
+};
+
+    }
+
+  } catch (err) {
+    console.error("Error in setupAqiStationTimeSeries:", err);
+  }
+}
+
+function getAqiColor(aqi) {
+  if (aqi == null || Number.isNaN(aqi)) {
+    return Cesium.Color.GRAY;
+  }
+  if (aqi <= 50)   return Cesium.Color.fromCssColorString("#009966");
+  if (aqi <= 100)  return Cesium.Color.fromCssColorString("#ffde33");
+  if (aqi <= 150)  return Cesium.Color.fromCssColorString("#ff9933");
+  if (aqi <= 200)  return Cesium.Color.fromCssColorString("#cc0033");
+  if (aqi <= 300)  return Cesium.Color.fromCssColorString("#660099");
+  return Cesium.Color.fromCssColorString("#7e0023");
+}
+
+
+async function setupAqiTimeline(viewer) {
+    try {
+        const response = await fetch(`/api/aqi/hourly/?hours=${HOURS_BACK_FOR_TIMELINE}`);
+        if (!response.ok) {
+            console.error("Failed to load hourly AQI data:", response.status, response.statusText);
+            return;
+        }
+
+        const data = await response.json();
+        const labels = data.labels || [];
+        const aqiHourly = (data.aqi && data.aqi.avg) || [];
+        const tempHourly = (data.iaqi && data.iaqi.t) || [];
+
+        if (!labels.length || labels.length !== aqiHourly.length || labels.length !== tempHourly.length) {
+            console.warn("Hourly AQI data is missing or inconsistent:", data);
+            return;
+        }
+
+        // 1) Convert ISO timestamps to Cesium JulianDates
+        const times = labels.map((iso) => Cesium.JulianDate.fromIso8601(iso));
+
+        // 2) Build SampledProperty for AQI and Temperature (NUMBER, not vectors)
+        const aqiProperty = new Cesium.SampledProperty(Number);
+        const tempProperty = new Cesium.SampledProperty(Number);
+
+        for (let i = 0; i < times.length; i++) {
+            const t = times[i];
+            const aqiVal = aqiHourly[i];
+            const tempVal = tempHourly[i];
+
+            if (typeof aqiVal === "number" && !Number.isNaN(aqiVal)) {
+                aqiProperty.addSample(t, aqiVal);
+            }
+            if (typeof tempVal === "number" && !Number.isNaN(tempVal)) {
+                tempProperty.addSample(t, tempVal);
+            }
+        }
+
+        // Optional: smoother interpolation
+        aqiProperty.setInterpolationOptions({
+            interpolationDegree: 1,
+            interpolationAlgorithm: Cesium.LinearApproximation
+        });
+        tempProperty.setInterpolationOptions({
+            interpolationDegree: 1,
+            interpolationAlgorithm: Cesium.LinearApproximation
+        });
+
+        // 3) Hook into the viewer clock + timeline
+        const start = times[0];
+        const stop = times[times.length - 1];
+
+        const clock = viewer.clock;
+        const timeline = viewer.timeline;
+
+        clock.startTime = start.clone();
+        clock.stopTime = stop.clone();
+        clock.currentTime = stop.clone();
+        clock.clockRange = Cesium.ClockRange.LOOP_STOP;  // loop from start to stop
+        clock.multiplier = 3600; // 1 simulated hour every real second
+        clock.shouldAnimate = true;               // ⬅ auto-play
+
+        if (timeline) {
+            timeline.zoomTo(start, stop);
+        }
+
+                // Expose for debugging if you like
+        window.AQI_TIME_SERIES = aqiProperty;
+        window.TEMP_TIME_SERIES = tempProperty;
+
+        // 4) Update the HTML panel on each tick
+        const timeEl = document.getElementById("ts-time");
+        const aqiEl = document.getElementById("ts-aqi");
+        const tempEl = document.getElementById("ts-temp");
+
+        if (overviewTimelineTickHandler) {
+          // remove old handler before adding a new one
+          viewer.clock.onTick.removeEventListener(overviewTimelineTickHandler);
+        }
+
+        overviewTimelineTickHandler = function(clock) {
+          const currentTime = clock.currentTime;
+
+          const date = Cesium.JulianDate.toDate(currentTime);
+          if (timeEl) {
+            timeEl.textContent = date.toLocaleString();
+          }
+
+          let aqiNow = aqiProperty.getValue(currentTime);
+          let tempNow = tempProperty.getValue(currentTime);
+
+          if (aqiEl) {
+            aqiEl.textContent = (aqiNow != null && !Number.isNaN(aqiNow))
+              ? aqiNow.toFixed(1)
+              : "–";
+          }
+          if (tempEl) {
+            tempEl.textContent = (tempNow != null && !Number.isNaN(tempNow))
+              ? tempNow.toFixed(1)
+              : "–";
+          }
+        };
+
+        viewer.clock.onTick.addEventListener(overviewTimelineTickHandler);
+
+
+    } catch (err) {
+        console.error("Error setting up AQI timeline:", err);
+    }
+}
+
+
+    startViewer();
+  </script>
+
+</body>
+</html>
